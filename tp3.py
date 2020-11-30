@@ -53,7 +53,7 @@ KMns = list()
 # Ks = list()
 predictions = list()
 max_centroids = 3
-centroids = np.linspace(2, max_centroids, (max_centroids - 1), dtype=int)
+centroids = range(2, max_centroids, 1)
 
 for i in range(0, 5):
     test_sets.append(pd.read_csv(f'data/u{i+1}.test', sep='\t',
@@ -73,7 +73,7 @@ for j in tqdm(centroids):
     KMns.append(KMeans(n_clusters=j))
     scores.clear()
     predictions.clear()
-    for i in tqdm(range(0, 5)):
+    for i in tqdm(range(5)):
         KMns[j - 2].fit(trfrms[i])
         predictions.append(KMns[j-2].predict(SVDs[i].transform(test_sets[i].loc[:, ['user id', 'item id', 'rating']])))
         scores.append(silhouette_score(test_sets[i].loc[:, ['user id', 'item id', 'rating']], predictions[i],
@@ -87,4 +87,4 @@ plt.savefig('fig.png')
 # Re-arrange know ratings in a m users X n items matrix
 pivot_data = data.loc[:, ['user id', 'item id', 'rating']].pivot(index = 'user id', columns=['item id'])
 
-input("press any key to exit...")
+print("All done!")
