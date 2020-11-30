@@ -61,6 +61,7 @@ for i in range(0, 5):
     SVDs.append(TruncatedSVD(n_components=2))
     trfrms.append(SVDs[i].fit_transform(base_sets[i].loc[:, ['user id', 'item id', 'rating']]))
 
+
 scores = list()
 scores_means = list()
 rmses = list()
@@ -72,10 +73,14 @@ for j in range(2, 40):
     for i in range(0, 5):
         KMns[j - 2].fit(trfrms[i])
         predictions.append(KMns[j-2].predict(SVDs[i].transform(test_sets[i].loc[:, ['user id', 'item id', 'rating']])))
-        scores.append(silhouette_score(test_sets[i].loc[:, ['user id', 'item id', 'rating']], predictions[i], metric='euclidean'))
+        scores.append(silhouette_score(test_sets[i].loc[:, ['user id', 'item id', 'rating']], predictions[i],
+                                       metric='euclidean'))
+        # rmses.append()
 
     scores_means.append(np.array(scores).mean())
-    rmses_means.append(np.array(rmses).mean())
+    # rmses_means.append(np.array(rmses).mean())
+
+plt.plot(scores_means, range(2, 40))
 
 # Re-arrange know ratings in a m users X n items matrix
 pivot_data = data.loc[:, ['user id', 'item id', 'rating']].pivot(index = 'user id', columns=['item id'])
