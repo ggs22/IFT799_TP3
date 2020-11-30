@@ -75,6 +75,7 @@ def plot_genres_means_distribution(genre_means:pd.DataFrame):
     plt.bar(x, genre_means[:].to_numpy()[0], width=0.35)
     plt.xticks(ticks=x, labels=genre_means.keys(), rotation='vertical')
     plt.ylim([y_min - np.abs(np.log10(y_min)/10), y_max + np.abs(np.log10(y_max)/10)])
+    # plt.savefig('images/{len(genre_means.keys())}_genres')
     plt.show()
 
 df = get_genres_means(data, items)
@@ -113,21 +114,22 @@ k_index = 0
 
 for j in tqdm(centroids):
     print(f'Using {j} centroids')
-    KMns.append(KMeans(n_clusters=int(j)))
+    KMns.append(KMeans(n_clusters=int(j),random_state=1))
     scores.clear()
     predictions.clear()
 
-    for i in tqdm(range(5)):
+    for i in tqdm(range(2)):
         KMns[k_index].fit(base_trfrms[i])
         pr = KMns[k_index].predict(test_trfrms[i])
         pr2 = KMns[k_index].fit_predict(base_trfrms[i])
         predictions.append(pr)
         # plt.scatter(base_trfrms[i][:, 0], base_trfrms[i][:, 1], c=pr2)
         plt.scatter(test_sets[i].iloc[:, 0], test_trfrms[i][:, 1], c=pr)
+        plt.savefig(f'images/set_{i} with {j} centroids.png')
         plt.show()
         # scores.append(silhouette_score(base_sets[i].loc[:, ['user id', 'item id', 'rating']], predictions[i],
         #                                metric='euclidean'))
-        scores.append(silhouette_score(test_sets[i].loc[:, ['user id', 'item id', 'rating']], predictions[i],
+        scores.append(silhouette_score(test_trfrms[i], predictions[i],
                                        metric='euclidean'))
 
     scores_means.append(np.array(scores).mean())
@@ -135,7 +137,7 @@ for j in tqdm(centroids):
     k_index += 1
 
 plt.plot(centroids, scores_means)
-plt.savefig('fig.png')
+plt.savefig('images/fig.png')
 plt.show()
 
 # Re-arrange know ratings in a m users X n items matrix
