@@ -48,7 +48,8 @@ items = pd.read_csv('data/u.item', sep='|', encoding='latin_1',
 test_sets = list()
 base_sets = list()
 SVDs = list()
-trfrms = list()
+base_trfrms = list()
+test_trfrms = list()
 KMns = list()
 # Ks = list()
 predictions = list()
@@ -62,24 +63,35 @@ for i in range(0, 5):
                                  names=['user id', 'item id', 'rating', 'timestamp']))
 
     SVDs.append(TruncatedSVD(n_components=2))
-    trfrms.append(SVDs[i].fit_transform(base_sets[i].loc[:, ['user id', 'item id', 'rating']]))
-
+    base_trfrms.append(SVDs[i].fit_transform(base_sets[i].loc[:, ['user id', 'item id', 'rating']]))
+    test_trfrms.append(SVDs[i].fit_transform(test_sets[i].loc[:, ['user id', 'item id', 'rating']]))
 
 scores = list()
 scores_means = list()
 rmses = list()
 rmses_means = list()
+k_index = 0
+
 for j in tqdm(centroids):
-    KMns.append(KMeans(n_clusters=j))
+    KMns.append(KMeans(n_clusters=int(j)))
     scores.clear()
     predictions.clear()
-    for i in tqdm(range(5)):
-        KMns[j - 2].fit(trfrms[i])
-        predictions.append(KMns[j-2].predict(SVDs[i].transform(test_sets[i].loc[:, ['user id', 'item id', 'rating']])))
-        scores.append(silhouette_score(test_sets[i].loc[:, ['user id', 'item id', 'rating']], predictions[i],
-                                       metric='euclidean'))
+
+    KMns[k_index].fit(base_trfrms[0])
+    predictions.append(KMns[k_index].predict(test_trfrms[0]))
+    scores.append(silhouette_score(test_sets[0].loc[:, ['user id', 'item id', 'rating']], predictions[0],
+                                   metric='euclidean'))
+
+    # for i in tqdm(range(5)):
+    #     KMns[k_index].fit(base_trfrms[i])
+    #     predictions.append(KMns[k_index].predict(test_trfrms[i]))
+    #     # scores.append(silhouette_score(test_sets[i].loc[:, ['user id', 'item id', 'rating']], predictions[i],
+    #     #                                metric='euclidean'))
+    #     rmses.append(mean_squared_error(test_trfrms[i]))
 
     scores_means.append(np.array(scores).mean())
+    rmses_means
+    k_index += 1
 
 plt.plot(centroids, scores_means)
 plt.savefig('fig.png')
