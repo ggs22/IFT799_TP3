@@ -93,7 +93,7 @@ test_trfrms = list()
 KMns = list()
 # Ks = list()
 predictions = list()
-max_centroids = 4
+max_centroids = 22
 centroids = range(2, max_centroids, 1)
 
 for i in range(0, 5):
@@ -118,14 +118,14 @@ for j in tqdm(centroids):
     scores.clear()
     predictions.clear()
 
-    for i in tqdm(range(2)):
+    for i in tqdm(range(5)):
         KMns[k_index].fit(base_trfrms[i])
         pr = KMns[k_index].predict(test_trfrms[i])
         pr2 = KMns[k_index].fit_predict(base_trfrms[i])
         predictions.append(pr)
         # plt.scatter(base_trfrms[i][:, 0], base_trfrms[i][:, 1], c=pr2)
         plt.scatter(test_sets[i].iloc[:, 0], test_trfrms[i][:, 1], c=pr)
-        plt.savefig(f'images/set_{i} with {j} centroids.png')
+        plt.savefig(f'images/{j}-centroids_set-{i}.png')
         plt.show()
         # scores.append(silhouette_score(base_sets[i].loc[:, ['user id', 'item id', 'rating']], predictions[i],
         #                                metric='euclidean'))
