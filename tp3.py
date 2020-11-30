@@ -9,6 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+from tqdm import tqdm
 from sklearn.decomposition import TruncatedSVD
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score, mean_squared_error
@@ -51,8 +52,8 @@ trfrms = list()
 KMns = list()
 # Ks = list()
 predictions = list()
-max_centroids = 40
-centroids = np.linspace(2, max_centroids, 1)
+max_centroids = 3
+centroids = np.linspace(2, max_centroids, (max_centroids - 1), dtype=int)
 
 for i in range(0, 5):
     test_sets.append(pd.read_csv(f'data/u{i+1}.test', sep='\t',
@@ -68,21 +69,19 @@ scores = list()
 scores_means = list()
 rmses = list()
 rmses_means = list()
-for j in centroids:
+for j in tqdm(centroids):
     KMns.append(KMeans(n_clusters=j))
     scores.clear()
     predictions.clear()
-    for i in range(0, 5):
+    for i in tqdm(range(0, 5)):
         KMns[j - 2].fit(trfrms[i])
         predictions.append(KMns[j-2].predict(SVDs[i].transform(test_sets[i].loc[:, ['user id', 'item id', 'rating']])))
         scores.append(silhouette_score(test_sets[i].loc[:, ['user id', 'item id', 'rating']], predictions[i],
                                        metric='euclidean'))
-        # rmses.append()
 
     scores_means.append(np.array(scores).mean())
-    # rmses_means.append(np.array(rmses).mean())
 
-plt.plot(scores_means, centroids)
+plt.plot(centroids, scores_means)
 plt.savefig('fig.png')
 
 # Re-arrange know ratings in a m users X n items matrix
