@@ -6,7 +6,6 @@ Gabriel Gibeau Sanchez - gibg2501
 
 import pandas as pd
 import numpy as np
-import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import seaborn as sns
@@ -36,6 +35,11 @@ items = pd.read_csv('data/u.item', sep='|', encoding='latin_1',
 
 data = pd.merge(left=data, right=items)
 data = pd.merge(left=data, right=items).drop(labels=['unknown'], axis=1)
+
+
+'''
+Helper functions
+'''
 
 
 def get_genres_means(_data, normaliztion=None):
@@ -93,48 +97,14 @@ def get_genres_mean_per_user(_data):
     res = res.replace(np.nan, 0)
     return res
 
+'''
+K-Mean-based method (model 1)
+'''
 
-# genres_means = get_genres_means(data)
-# plot_genres_means_distribution(genres_means)
-#
-# nmdf = genres_means = get_genres_means(data, normaliztion='naive')
-# plot_genres_means_distribution(nmdf)
-#
-# genres_counts = get_genres_count(data)
-# plot_genres_means_distribution(genres_counts)
-#
-# # Re-arrange know ratings in a m users X n items matrix
-# pivot_data = data.loc[:, ['user id', 'item id', 'rating']].pivot(index='user id', columns=['item id'])
-#
-# # Plot some heat maps of the known rating
-# sns.heatmap(pivot_data, cmap='autumn')
-# plt.show()
+# Get the average rating for each film genre, for each user
+genre_mean_per_user = get_genres_mean_per_user(data)
+print(genre_mean_per_user.head().to_string())
 
-# # Get the average rating for each film genre, for each user
-# genre_mean_per_user = get_genres_mean_per_user(data)
-#
-# # Plot genre mean rating per user
-# sns.heatmap(genre_mean_per_user, cmap='Greens')
-# plt.show()
-
-# for i in range(5):
-#     sns.heatmap(pivot_data[pivot_data['rating'] == i+1], cmap='twilight')
-#     plt.show()
-
-
-# for i in range(5):
-#     for idx, genre in enumerate(genres):
-#         plt.scatter(data[(data['rating'] == i+1) & (data[genre] == 1)].loc[:, 'item id'],
-#                     data[(data['rating'] == i+1) & (data[genre] == 1)].loc[:, 'user id'],
-#                     marker='.',
-#                     s=0.5,
-#                     color=cm.nipy_spectral(float(idx)/len(genres)))
-#     plt.title(f'rating:{i}')
-#     plt.legend(genres)
-#     plt.savefig(f'images/rating:{i}')
-
-
-# Load split data and make SVD transformations
 test_sets = list()
 base_sets = list()
 SVDs = list()
@@ -155,6 +125,7 @@ for i in range(0, 5):
     base_trfrms.append(SVDs[i].fit_transform(_base_gmean_u))
     test_trfrms.append(SVDs[i].fit_transform(_test_gmean_u))
 
+# If it hasn't been done, perform elbow method to determine optimal cluster number
 if not path.Path('images/elbow_method.png').exists():
     centroids = range(4, 9, 1) # lets use 10 cluster number values
     scores = list()
@@ -196,35 +167,37 @@ if not path.Path('images/elbow_method.png').exists():
         k_index += 1
         scores_means.append(np.array(scores).mean())
 
-    # Plot silhouette scores
+    # Plot elbow curve
     plt.plot(centroids, scores_means)
     plt.xticks(centroids)
     plt.savefig(f'images/elbow_method.png')
     plt.show()
 
-
-# Dtermined with the elbow method
+# Dtermined with the elbow method (see elbow graph)
 nb_clusters = 5
 nb_datasets = 5
 
+rmse_per_cluster = pd.DataFrame()
+rmse_discrete_per_cluster = pd.DataFrame()
+rmse_rdn_per_cluster = pd.DataFrame()
+
+rmse = list()
+rmse_discrete = list()
+rmse_rdn = list()
 cols = list()
 rows = list()
 
-rmse_per_cluster = pd.DataFrame()
-rmse_rdn_per_cluster = pd.DataFrame()
-rmse = list()
-rmse_rdn = list()
+# For each data set
 for i in tqdm(range(nb_datasets), desc='Datasets'):
 
-    cols += [f'dataset-{i}']
+    # Make a kmean with optimal number of clusters
     kmn = KMeans(n_clusters=nb_clusters)
-
-    # get centroids
+    # get centroids from transformed base data
     base_prediction = kmn.fit_predict(base_trfrms[i])
     # get prediction on transformed data
     test_prediction = kmn.predict(test_trfrms[i])
 
-    # join prediction on transformed data with original data
+    # join prediction on transformed data with original data (base & test data)
     joint_base_predictions = pd.DataFrame(base_prediction, columns=['cluster'])
     joint_base_predictions['user id'] = range(1, len(base_prediction) + 1)
     joint_base_predictions = base_sets[i].join(joint_base_predictions.set_index('user id'), on='user id')
@@ -234,42 +207,76 @@ for i in tqdm(range(nb_datasets), desc='Datasets'):
     joint_test_prediction = test_sets[i].join(joint_test_prediction.set_index('item id'), on='item id')
 
     rmse.clear()
+    rmse_discrete.clear()
     rmse_rdn.clear()
-    # use centroids to make predictions on test set
+
+    cols += [f'dataset-{i}']
+
+    # For each cluster
     for j in tqdm(range(nb_clusters), desc='Clusters'):
         rows += [f'cluster-{j}']
+
+        # Get the mean of each movie for current cluster
         movies_mean = joint_base_predictions.loc[joint_base_predictions['cluster'] == j,
                                              ['item id', 'rating']].groupby(['item id']).mean()
         movies_mean['item id'] = range(1, movies_mean.shape[0]+1)
-        movies_mean['predicted rating'] = movies_mean['rating'].round()
+        movies_mean['predicted rating'] = movies_mean['rating']
+        movies_mean['discrete predicted rating'] = movies_mean['rating'].round()
         movies_mean.drop(labels=['rating'], axis=1, inplace=True)
 
-        # Create a data frame containing rating average for current cluster
+        # Join a data frame containing rating prediction & discrete rating prediction & actual rating
         movie_predictions = \
             joint_test_prediction[joint_test_prediction['cluster'] == j].join(movies_mean.set_index('item id'),
                                                                               on='item id')
 
         # Get RMSE between prediction an actual ratings in current cluster
         rmse.append(np.sqrt(((movie_predictions['rating'] - movie_predictions['predicted rating'])**2).mean()))
+        # Get RMSE between discrete prediction an actual ratings in current cluster
+        rmse_discrete.append(np.sqrt(((movie_predictions['rating'] - movie_predictions['discrete predicted rating']) ** 2).mean()))
         # Get random vector of 5 values to compare with clustering algorithme
         rmse_rdn.append(np.sqrt(((movie_predictions['rating'] - np.random.randint(1, 6, movie_predictions.shape[0]))**2). mean()))
+
     rmse_per_cluster = pd.concat([rmse_per_cluster, pd.Series(rmse)], axis=1)
+    rmse_discrete_per_cluster = pd.concat([rmse_discrete_per_cluster, pd.Series(rmse_discrete)], axis=1)
     rmse_rdn_per_cluster = pd.concat([rmse_rdn_per_cluster, pd.Series(rmse_rdn)], axis=1)
 
 rmse_per_cluster.columns = cols
+rmse_discrete_per_cluster.columns = cols
 rmse_rdn_per_cluster.columns = cols
+
 rmse_per_cluster.index = keys=rows[:nb_clusters]
+rmse_discrete_per_cluster.index = keys=rows[:nb_clusters]
 rmse_rdn_per_cluster.index = keys=rows[:nb_clusters]
 
-sns.heatmap(rmse_per_cluster, vmin=1, vmax=2)
+# Plot repectives RMSEs
+sns.heatmap(rmse_per_cluster, vmin=0.5, vmax=2.5, cmap='Reds', annot=True)
+plt.title('Predictions RMSE')
+plt.savefig('images/Predictions_RMSE')
 plt.show()
 
-sns.heatmap(rmse_rdn_per_cluster, vmin=1, vmax=2)
+sns.heatmap(rmse_discrete_per_cluster, vmin=0.5, vmax=2.5, cmap='Reds', annot=True)
+plt.title('Discrete predictions RMSE')
+plt.savefig('images/Discrete_predictions_RMSE')
 plt.show()
 
-# sns.heatmap(rmse_rdn_per_cluster)
-# plt.show()
+sns.heatmap(rmse_rdn_per_cluster, vmin=0.5, vmax=2.5, cmap='Reds', annot=True)
+plt.title('random vector RMSE')
+plt.savefig('images/random_vector_RMSE')
+plt.show()
 
+# Plot random vs discrete prediction RMSE
+sns.barplot(data=rmse_rdn_per_cluster, color='r')
+sns.barplot(data=rmse_discrete_per_cluster, color='g')
+plt.title('Random vector RMSE vs Prediction RMSE')
+plt.savefig('images/Random_vector_RMSE_vs_Prediction_RMSE.png')
+plt.show()
+
+
+'''
+Collaborative filtering method (model 4)
+'''
+
+ # Re-arrange know ratings in a m users X n items matrix
+pivot_data = data.loc[:, ['user id', 'item id', 'rating']].pivot(index='user id', columns=['item id'])
 
 print("All done!")
-
