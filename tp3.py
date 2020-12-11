@@ -47,7 +47,7 @@ Helper functions
 
 
 def get_distance_table(point: pd.Series, points_set: pd.DataFrame):
-    return points_set.sub(row, axis=1).pow(2).sum(axis=1).pow(.5)
+    return points_set.sub(point, axis=1).pow(2).sum(axis=1).pow(.5)
 
 
 def get_genres_means(_data, normaliztion=None):
@@ -286,7 +286,7 @@ User-based classification
 '''
 
 # Defin numbers of nearest neighbors
-k_nn = 10
+k_nn = 25
 
 # Re-arrange know ratings in a m users X n items matrix
 pivot_data = data.loc[:, ['user id', 'item id', 'rating']].pivot(index='user id', columns=['item id'])
@@ -348,7 +348,7 @@ for i in tqdm(range(0, nb_datasets), desc='Data Sets'):
 
             # Get only userid (as index) of base nearest neibghbors in a dataframe, except the point itself
             nearest_neighbors_per_user = pd.concat([nearest_neighbors_per_user,
-                                                    pd.Series(dist.sort_values().iloc[:10].index)], axis=1)
+                                                    pd.Series(dist.sort_values().iloc[:k_nn].index)], axis=1)
 
         # Save distance table for re-use
         f_dist_table = open(fname_dist_table, 'wb')
@@ -379,17 +379,38 @@ for i in tqdm(range(0, nb_datasets), desc='Data Sets'):
     nearest_neighbors[i] = nearest_neighbors[i].transpose()
     nearest_neighbors[i].index = pivot_data_test[i].index
 
-    ##TODO
-    #Align columns between test and base
+    _df = pivot_data_base[i].transpose()
+    s = _df.index.to_numpy()
+    _df.insert(0, 'rating',s , allow_duplicates=False)
 
+    mrgr = pd.merge(pivot_data_test[i].transpose(), pivot_data_base[i].transpose(),
+                    left_index=True, right_index=True, how='inner')
 
+    pivot_data_base[i].columns = pivot_data_base[i].columns.droplevel()
+    pivot_data_test[i].columns = pivot_data_test[i].columns.droplevel()
 
-    ##TODO
-    # Get similarity between test user and each base nearest neighbor
-    _df = pd.DataFrame(cosine_similarity(pivot_data_base[i]))
-    _df.index = pivot_data_base[i].index
-    similarity_user_vs_nns.append(_df)
+    # Merge normalized base and test data to be able to compute distance & similarity
+    merged_data = pd.merge(pivot_data_base[i], pivot_data_test[i], left_index=True, right_index=True, how='outer',
+                           suffixes=('_base', '_test')).dropna(axis=1)
 
+    # for each of the nearest neighbors, append test user and get similarity
+    for index, row in nearest_neighbors[i].iterrows():
+        m = pd.concat([merged_data.iloc[row, :].T, merged_data.iloc[index, :]], axis=1)
+        s = pd.DataFrame(cosine_similarity(m.T), index=[*row, index], columns=[*row, index])
+        # get weights from similiraty, drop the last element as it is test user
+        w = s.iloc[:-1:, -1:]
 
+        weighted_votes = pd.DataFrame()
+        for i in range(1, 6):
+            weighted_votes = pd.concat([weighted_votes,
+                                        (m.iloc[:, :-1:] == (i/5)).multiply(w.T.to_numpy()).sum(axis=1)],
+                                       axis=1)
+        weighted_votes.columns = range(1,6)
+        # Here we make the predication based on the weighted votes of knns.
+        # The prediction is "de-normalized" by the face that column index correspond to
+        # original rating
+        predictions = weighted_votes.idxmax(axis=1)
+
+        rmse = np.sqrt(mean_squared_error(predictions, merged_data.iloc[index, :]))
 
 print("All done!")
