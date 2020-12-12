@@ -138,8 +138,10 @@ for i in range(0, nb_datasets):
 
 # If it hasn't been done, perform elbow method to determine optimal cluster number
 if not path.Path('images/elbow_method.png').exists():
-    centroids = range(4, 9, 1) # lets use 10 cluster number values
+    centroids = range(2, 22, 1) # lets use 10 cluster number values
     scores = list()
+    inertia = list()
+    inertia_means = list()
     scores_means = list()
     k_index = 0
 
@@ -151,6 +153,7 @@ if not path.Path('images/elbow_method.png').exists():
 
         for i in tqdm(range(nb_datasets)):
             pr = kmn.fit_predict(base_trfrms[i])
+            inertia.append(kmn.inertia_)
             samples = silhouette_samples(base_trfrms[i], pr)
             scores.append(silhouette_score(base_trfrms[i], pr, metric='euclidean'))
             y_low = 10
@@ -177,15 +180,24 @@ if not path.Path('images/elbow_method.png').exists():
 
         k_index += 1
         scores_means.append(np.array(scores).mean())
+        inertia_means.append(np.array(inertia).mean())
 
-    # Plot elbow curve
+    # Plot silhouette curve
     plt.plot(centroids, scores_means)
     plt.xticks(centroids)
+    plt.title(f'Silhouette scores per cluster number')
+    plt.savefig(f'images/silhouette_method.png')
+    plt.show()
+
+    # Plot elbow curve
+    plt.plot(centroids, inertia_means)
+    plt.xticks(centroids)
+    plt.title(f'Elbow method')
     plt.savefig(f'images/elbow_method.png')
     plt.show()
 
 # Dtermined with the elbow method (see elbow graph)
-nb_clusters = 5
+nb_clusters = 12
 
 rmse_per_cluster = pd.DataFrame()
 rmse_discrete_per_cluster = pd.DataFrame()
@@ -436,7 +448,7 @@ for i in tqdm(range(0, nb_datasets), desc='Data Sets'):
 
     rmse_per_dataset = pd.concat([rmse_per_dataset, pd.Series(pred_rmse)], axis=1)
 
-rmse_per_dataset.columns = cols
+rmse_per_dataset.columns = range(1, nb_datasets+1)
 
 sns.histplot(data=rmse_per_dataset)
 plt.savefig(f'images/method4_rmse_histo_{k_nn}knn.png')
