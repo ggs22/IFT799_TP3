@@ -8,15 +8,10 @@ Modele 3
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.cm as cm
 import seaborn as sns
-import path
-import pickle
 
 from tqdm import tqdm
-from sklearn.decomposition import TruncatedSVD
 from sklearn.cluster import KMeans
-from sklearn.metrics import silhouette_score, silhouette_samples
 
 # Load genres names
 genres = pd.read_csv('data/u.genre', sep='|').iloc[:, 0]
