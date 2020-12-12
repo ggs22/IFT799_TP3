@@ -16,4 +16,4 @@ Model 1 and 4 are implemented in tp3.py. Model 3 is implemented in tp3_model3.py
 ### Serialized object
 In order to avoid redundant calculations, some objects are serialized using Pickle. The python script looks for 
 pickle object in the working directory, and loads them if they are available. If not, it performs the elbow method 
-and some euclidian distance calculation from scratch.
+and some euclidian distance calculation from scratch. The pickle object stored in ./pickle_objects can be copied to the root directory for reuse.
